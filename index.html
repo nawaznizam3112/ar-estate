@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Project</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    :root { --bg:#f6f7f9; --card:#fff; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
+            --brand:#0f766e; --sold:#f59e0b; --free:#10b981; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#0b1220; --card:#111a2e; --ink:#f3f4f6; --muted:#9ca3af; --line:#1f2a44; --brand:#2dd4bf; }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+    [hidden] { display: none !important; }
+
+    #page { position: fixed; inset: 0; z-index: 50; overflow-y: auto; background: var(--bg);
+            padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; }
+    .eyebrow { color: var(--brand); font-weight: 600; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+    h1 { margin: 4px 0 2px; font-size: 30px; line-height: 1.15; }
+    h2 { margin: 0 0 10px; font-size: 15px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .muted { color: var(--muted); margin: 0; }
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+    .badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 12px 0; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 8px; }
+    .bar > i { display: block; height: 100%; background: var(--free); }
+    .upd { padding: 8px 0; border-top: 1px solid var(--line); }
+    .upd:first-of-type { border-top: 0; }
+    .upd small { color: var(--muted); display: block; }
+    .actions { display: grid; gap: 10px; margin: 16px 0; }
+    .btn { display: block; text-align: center; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600;
+           border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; cursor: pointer; }
+    .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    @media (prefers-color-scheme: dark) { .btn.primary { color: #052e2b; } }
+    form { display: grid; gap: 10px; }
+    input[type=text], input[type=tel] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+           background: var(--bg); color: var(--ink); font-size: 16px; }
+    label.chk { font-size: 14px; color: var(--muted); display: flex; gap: 8px; align-items: flex-start; }
+    .note { font-size: 12px; color: var(--muted); margin-top: 18px; }
+    .msg { font-size: 14px; margin: 6px 0 0; }
+
+    #arbar-top, #arbar-bottom { position: fixed; left: 0; right: 0; z-index: 60; padding: 10px 12px; display: flex;
+            align-items: center; justify-content: space-between; gap: 8px; color: #fff; }
+    #arbar-top { top: 0; padding-top: calc(10px + env(safe-area-inset-top, 0px)); background: linear-gradient(#000a, transparent); }
+    #arbar-bottom { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, #000a); }
+    .pill { background: #fff; color: #111; border-radius: 999px; padding: 10px 16px; font-weight: 600; font-size: 15px;
+            border: 0; text-decoration: none; cursor: pointer; }
+    #hint { font-size: 14px; text-shadow: 0 0 4px #000; }
+  </style>
+</head>
+<body>
+
+  <div id="page"><div class="wrap" id="content">Loading…</div></div>
+
+  <div id="arbar-top" hidden>
+    <button class="pill" id="btn-back">← Back</button>
+    <strong id="ar-title"></strong>
+  </div>
+  <div id="arbar-bottom" hidden>
+    <span id="hint">Point your camera at the card’s pattern</span>
+    <a class="pill" id="ar-wa" target="_blank" rel="noopener">WhatsApp</a>
+  </div>
+
+  <!-- AR scene starts only when the visitor taps “View in 3D” (autoStart: false), so the camera permission prompt is not shown up front. -->
+  <a-scene id="scene"
+           mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; maxTrack: 1;"
+           color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights"
+           vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-entity light="type: ambient; color: #ffffff; intensity: 1.1"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 0.9" position="1 1 2"></a-entity>
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-entity id="target" mindar-image-target="targetIndex: 0"></a-entity>
+  </a-scene>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const pid = params.get('p') || 'greenmeadows';
+  const cpCode = (params.get('cp') || '').toLowerCase();
+  let DATA, P, CP;
+
+  // Tiny DOM helper. Uses textContent only, so data from the JSON can never inject HTML.
+  function h(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (k === 'class') e.className = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    }
+    e.append(...kids.flat().filter((x) => x !== null && x !== undefined && x !== false));
+    return e;
+  }
+  const badge = (t) => h('span', { class: 'badge' }, t);
+  const fmtDate = (s) => new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const pctOf = () => Math.max(0, Math.min(100, (P.progress && P.progress.percent) || 0));
+
+  function waLink(text) {
+    return 'https://wa.me/' + P.sales_whatsapp + '?text=' + encodeURIComponent(text);
+  }
+  function baseMsg() {
+    return 'Hi, I’m interested in ' + P.name + '.' + (CP ? ' (Ref: ' + cpCode + ')' : '');
+  }
+
+  fetch('data/projects.json', { cache: 'no-store' })
+    .then((r) => r.json())
+    .then(init)
+    .catch(() => { $('content').textContent = 'Could not load project data.'; });
+
+  function init(d) {
+    DATA = d;
+    P = d.projects[pid];
+    if (!P) { $('content').textContent = 'Project not found.'; return; }
+    CP = (P.cps || {})[cpCode] || null;
+    document.title = P.name;
+    $('ar-title').textContent = P.name;
+    $('ar-wa').href = waLink(baseMsg());
+    render();
+    buildScene();
+  }
+
+  function render() {
+    const root = $('content');
+    root.replaceChildren();
+    const pct = pctOf();
+
+    const form = h('form', { hidden: '', id: 'lead-form' },
+      h('input', { type: 'text', id: 'fname', placeholder: 'Your name', required: '', autocomplete: 'name' }),
+      h('input', { type: 'tel', id: 'fphone', placeholder: 'Phone number', required: '', autocomplete: 'tel', pattern: '[0-9+ ]{10,15}' }),
+      h('label', { class: 'chk' }, h('input', { type: 'checkbox', id: 'fconsent', required: '' }),
+        'I agree to be contacted about this project.'),
+      h('button', { class: 'btn primary', type: 'submit' }, 'Request site visit'),
+      h('p', { class: 'msg', id: 'lead-msg' })
+    );
+    form.addEventListener('submit', submitLead);
+
+    root.append(
+      h('div', { class: 'eyebrow' }, P.builder),
+      h('h1', {}, P.name),
+      h('p', { class: 'muted' }, P.location),
+      h('div', { class: 'badges' }, badge(P.status), badge('Possession ' + P.possession), badge('RERA ' + P.rera)),
+
+      CP && h('div', { class: 'card' }, h('strong', {}, CP.name), ' · ' + (CP.role || 'Channel partner')),
+
+      h('div', { class: 'card' }, h('div', { class: 'row' }, h('span', {}, P.configs), h('strong', {}, P.price_from))),
+
+      h('div', { class: 'card' },
+        h('h2', {}, 'Construction progress'),
+        h('div', { class: 'row' }, h('span', {}, P.progress.stage), h('strong', {}, pct + '%')),
+        h('div', { class: 'bar' }, h('i', { style: 'width:' + pct + '%' }))
+      ),
+
+      h('div', { class: 'card' },
+        h('h2', {}, 'Availability'),
+        (P.towers || []).map((t) => h('div', { style: 'margin:8px 0' },
+          h('div', { class: 'row' }, h('span', {}, t.name), h('span', { class: 'muted' }, t.units_available + ' of ' + t.units_total + ' available')),
+          h('div', { class: 'bar' }, h('i', { style: 'width:' + (t.units_total ? (100 * t.units_available / t.units_total) : 0) + '%' }))
+        ))
+      ),
+
+      h('div', { class: 'card' },
+        h('h2', {}, 'Latest updates'),
+        (P.updates || []).slice(0, 5).map((u) => h('div', { class: 'upd' }, h('small', {}, fmtDate(u.date)), u.text))
+      ),
+
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn primary', onclick: startAR }, 'View in 3D / AR'),
+        h('a', { class: 'btn', href: waLink(baseMsg()), target: '_blank', rel: 'noopener' }, 'Chat on WhatsApp'),
+        h('button', { class: 'btn', onclick: () => { form.hidden = !form.hidden; } }, 'Book a site visit')
+      ),
+      form,
+      h('p', { class: 'note' }, P.disclaimer || '')
+    );
+  }
+
+  async function submitLead(e) {
+    e.preventDefault();
+    const f = e.target.elements;
+    const lead = { project: pid, cp: cpCode || null, name: f.fname.value.trim(), phone: f.fphone.value.trim(),
+                   consent: f.fconsent.checked, ts: new Date().toISOString() };
+    const msg = $('lead-msg');
+    const ep = DATA.config && DATA.config.lead_endpoint;
+    if (ep) {
+      try {
+        const r = await fetch(ep, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) });
+        if (!r.ok) throw new Error('bad status');
+        msg.textContent = 'Thank you! The sales team will call you shortly.';
+        e.target.reset();
+      } catch (err) {
+        msg.textContent = 'Could not send right now. Please use WhatsApp instead.';
+      }
+      return;
+    }
+    // DEMO FALLBACK: no backend yet, so the lead is NOT stored; hand it to WhatsApp instead.
+    console.log('LEAD (demo, not stored)', lead);
+    location.href = waLink('Please book a site visit for me. Name: ' + lead.name + ', Phone: ' + lead.phone +
+                           (CP ? ' (Ref: ' + cpCode + ')' : ''));
+  }
+
+  // ---------- AR scene built from data ----------
+  function mk(tag, attrs, parent) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    parent.appendChild(e);
+    return e;
+  }
+
+  function buildScene() {
+    const target = $('target');
+    const towers = (P.towers || []).slice(0, 3);
+    towers.forEach((t, i) => {
+      const x = towers.length === 1 ? 0 : -0.25 + i * (0.5 / (towers.length - 1));
+      const group = mk('a-entity', { position: x + ' 0.05 0' }, target);
+      const spin = mk('a-entity', { animation: 'property: rotation; to: 0 0 360; dur: 24000; loop: true; easing: linear' }, group);
+
+      const soldFrac = t.units_total ? 1 - t.units_available / t.units_total : 0;
+      const soldFloors = Math.round(t.floors * soldFrac);
+      const floorH = Math.min(0.04, 0.4 / t.floors);
+      for (let f = 0; f < t.floors; f++) {
+        mk('a-box', {
+          width: 0.17, height: 0.17, depth: floorH * 0.9,
+          position: '0 0 ' + ((f + 0.5) * floorH),
+          material: 'color: ' + (f < soldFloors ? '#F59E0B' : '#10B981')
+        }, spin);
+      }
+      mk('a-text', { value: t.name, align: 'center', color: '#ffffff', width: 0.7, position: '0 -0.16 0.01' }, group);
+    });
+
+    const pct = pctOf();
+    mk('a-plane', { width: 0.8, height: 0.035, position: '0 -0.42 0.002', color: '#374151' }, target);
+    mk('a-plane', { width: Math.max(0.001, 0.8 * pct / 100), height: 0.035,
+                    position: (-0.4 + 0.4 * pct / 100) + ' -0.42 0.004', color: '#10B981' }, target);
+    mk('a-text', { value: 'Construction ' + pct + '%', align: 'center', color: '#ffffff', width: 0.9, position: '0 -0.36 0.01' }, target);
+
+    target.addEventListener('targetFound', () => { $('hint').textContent = 'Amber = sold floors · Green = available'; });
+    target.addEventListener('targetLost', () => { $('hint').textContent = 'Point your camera at the card’s pattern'; });
+  }
+
+  async function startAR() {
+    $('page').hidden = true;
+    $('arbar-top').hidden = false;
+    $('arbar-bottom').hidden = false;
+    try {
+      const sys = $('scene').systems['mindar-image-system'];
+      await sys.start();
+    } catch (err) {
+      console.error(err);
+      stopAR();
+      alert('Could not start AR. Please allow camera access and make sure targets.mind is uploaded.');
+    }
+  }
+  function stopAR() {
+    try { $('scene').systems['mindar-image-system'].stop(); } catch (e) { /* ignore */ }
+    $('arbar-top').hidden = true;
+    $('arbar-bottom').hidden = true;
+    $('page').hidden = false;
+  }
+  $('btn-back').addEventListener('click', stopAR);
+</script>
+</body>
+</html>
