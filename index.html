@@ -35,7 +35,7 @@
     .upd small { color: var(--muted); display: block; }
     .actions { display: grid; gap: 10px; margin: 16px 0; }
     .btn { display: block; text-align: center; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600;
-           border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; cursor: pointer; }
+           border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; cursor: pointer; width: 100%; }
     .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
     @media (prefers-color-scheme: dark) { .btn.primary { color: #052e2b; } }
     form { display: grid; gap: 10px; }
@@ -45,33 +45,53 @@
     .note { font-size: 12px; color: var(--muted); margin-top: 18px; }
     .msg { font-size: 14px; margin: 6px 0 0; }
 
-    #arbar-top, #arbar-bottom { position: fixed; left: 0; right: 0; z-index: 60; padding: 10px 12px; display: flex;
-            align-items: center; justify-content: space-between; gap: 8px; color: #fff; }
-    #arbar-top { top: 0; padding-top: calc(10px + env(safe-area-inset-top, 0px)); background: linear-gradient(#000a, transparent); }
-    #arbar-bottom { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, #000a); }
+    /* photos + video on the normal page */
+    .strip { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
+    .strip figure { margin: 0; flex: 0 0 82%; scroll-snap-align: start; }
+    .strip img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 10px; display: block; background: var(--line); }
+    .strip figcaption { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    video.pv { width: 100%; border-radius: 10px; background: #000; display: block; }
+    .cap { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+    /* AR overlay */
+    .ar-top, .ar-bottom { position: fixed; left: 0; right: 0; z-index: 60; color: #fff; }
+    .ar-top { top: 0; display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+              background: linear-gradient(#000b, transparent); }
+    .ar-top strong { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ar-bottom { bottom: 0; display: flex; flex-direction: column; gap: 8px; align-items: center;
+                 padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, #000b); }
+    #ar-caption { font-size: 14px; text-align: center; text-shadow: 0 0 4px #000; min-height: 20px; }
+    .ctl { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
     .pill { background: #fff; color: #111; border-radius: 999px; padding: 10px 16px; font-weight: 600; font-size: 15px;
-            border: 0; text-decoration: none; cursor: pointer; }
-    #hint { font-size: 14px; text-shadow: 0 0 4px #000; }
+            border: 0; text-decoration: none; cursor: pointer; white-space: nowrap; }
+    .pill.sm { padding: 8px 14px; font-size: 14px; }
+    .pill.tab { background: #ffffff30; color: #fff; }
+    .pill.tab.on { background: #fff; color: #111; }
   </style>
 </head>
 <body>
 
+  <audio id="music" loop preload="none"></audio>
+
   <div id="page"><div class="wrap" id="content">Loading…</div></div>
 
-  <div id="arbar-top" hidden>
-    <button class="pill" id="btn-back">← Back</button>
+  <div class="ar-top" id="ar-top" hidden>
+    <button class="pill sm" id="btn-back">← Back</button>
     <strong id="ar-title"></strong>
+    <a class="pill sm" id="ar-wa" target="_blank" rel="noopener">WhatsApp</a>
   </div>
-  <div id="arbar-bottom" hidden>
-    <span id="hint">Point your camera at the card’s pattern</span>
-    <a class="pill" id="ar-wa" target="_blank" rel="noopener">WhatsApp</a>
+  <div class="ar-bottom" id="ar-bottom" hidden>
+    <div id="ar-caption"></div>
+    <div class="ctl" id="ar-controls"></div>
+    <div class="ctl" id="ar-tabs"></div>
   </div>
 
-  <!-- AR scene starts only when the visitor taps “View in 3D” (autoStart: false), so the camera permission prompt is not shown up front. -->
+  <!-- The AR scene starts only when the visitor taps “View in 3D” (autoStart: false), so the camera prompt is not shown up front. -->
   <a-scene id="scene"
            mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; maxTrack: 1;"
            color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights"
            vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-assets id="assets"></a-assets>
     <a-entity light="type: ambient; color: #ffffff; intensity: 1.1"></a-entity>
     <a-entity light="type: directional; color: #ffffff; intensity: 0.9" position="1 1 2"></a-entity>
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -99,18 +119,20 @@
   const badge = (t) => h('span', { class: 'badge' }, t);
   const fmtDate = (s) => new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const pctOf = () => Math.max(0, Math.min(100, (P.progress && P.progress.percent) || 0));
+  const safePlay = (el) => { try { const r = el.play(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* ignore */ } };
 
-  function waLink(text) {
-    return 'https://wa.me/' + P.sales_whatsapp + '?text=' + encodeURIComponent(text);
-  }
-  function baseMsg() {
-    return 'Hi, I’m interested in ' + P.name + '.' + (CP ? ' (Ref: ' + cpCode + ')' : '');
-  }
+  const media = () => P.media || {};
+  const gallery = () => (media().gallery || []).filter((g) => g && g.src);
+  const videoInfo = () => (media().video && media().video.src ? media().video : null);
+  const audioInfo = () => (media().audio && media().audio.src ? media().audio : null);
+
+  function waLink(text) { return 'https://wa.me/' + P.sales_whatsapp + '?text=' + encodeURIComponent(text); }
+  function baseMsg() { return 'Hi, I’m interested in ' + P.name + '.' + (CP ? ' (Ref: ' + cpCode + ')' : ''); }
 
   fetch('data/projects.json', { cache: 'no-store' })
     .then((r) => r.json())
     .then(init)
-    .catch(() => { $('content').textContent = 'Could not load project data.'; });
+    .catch((e) => { console.error(e); $('content').textContent = 'Could not load project data.'; });
 
   function init(d) {
     DATA = d;
@@ -120,14 +142,37 @@
     document.title = P.name;
     $('ar-title').textContent = P.name;
     $('ar-wa').href = waLink(baseMsg());
+    setupMusic();
     render();
     buildScene();
   }
 
+  /* ---------------- music (shared by the page and the AR screen) ---------------- */
+  function setupMusic() {
+    const a = audioInfo();
+    if (!a) return;
+    const m = $('music');
+    m.src = a.src;
+    const sync = () => document.querySelectorAll('.music-btn').forEach((b) => { b.textContent = musicLabel(); });
+    ['play', 'pause', 'ended'].forEach((ev) => m.addEventListener(ev, sync));
+  }
+  function musicLabel() {
+    const a = audioInfo();
+    return $('music').paused ? '♫ ' + ((a && a.label) || 'Play music') : '❚❚ Pause music';
+  }
+  function toggleMusic() {
+    const m = $('music');
+    if (m.paused) { if (videoEl) videoEl.muted = true; safePlay(m); } else { m.pause(); }
+  }
+  const musicButton = (cls) => audioInfo() ? h('button', { class: cls + ' music-btn', onclick: toggleMusic }, musicLabel()) : null;
+
+  /* ---------------- normal project page ---------------- */
   function render() {
     const root = $('content');
     root.replaceChildren();
     const pct = pctOf();
+    const gal = gallery();
+    const vid = videoInfo();
 
     const form = h('form', { hidden: '', id: 'lead-form' },
       h('input', { type: 'text', id: 'fname', placeholder: 'Your name', required: '', autocomplete: 'name' }),
@@ -146,7 +191,6 @@
       h('div', { class: 'badges' }, badge(P.status), badge('Possession ' + P.possession), badge('RERA ' + P.rera)),
 
       CP && h('div', { class: 'card' }, h('strong', {}, CP.name), ' · ' + (CP.role || 'Channel partner')),
-
       h('div', { class: 'card' }, h('div', { class: 'row' }, h('span', {}, P.configs), h('strong', {}, P.price_from))),
 
       h('div', { class: 'card' },
@@ -154,6 +198,22 @@
         h('div', { class: 'row' }, h('span', {}, P.progress.stage), h('strong', {}, pct + '%')),
         h('div', { class: 'bar' }, h('i', { style: 'width:' + pct + '%' }))
       ),
+
+      gal.length > 0 && h('div', { class: 'card' },
+        h('h2', {}, 'Site photos'),
+        h('div', { class: 'strip' }, gal.map((g) => h('figure', {},
+          h('img', { src: g.src, alt: g.caption || 'Site photo', loading: 'lazy' }),
+          g.caption ? h('figcaption', {}, g.caption) : null)))
+      ),
+
+      vid && h('div', { class: 'card' },
+        h('h2', {}, 'Video'),
+        h('video', Object.assign({ class: 'pv', controls: '', playsinline: '', preload: 'none', src: vid.src },
+          vid.poster ? { poster: vid.poster } : {})),
+        vid.caption ? h('p', { class: 'cap' }, vid.caption) : null
+      ),
+
+      audioInfo() && h('div', { class: 'card' }, musicButton('btn')),
 
       h('div', { class: 'card' },
         h('h2', {}, 'Availability'),
@@ -202,7 +262,7 @@
                            (CP ? ' (Ref: ' + cpCode + ')' : ''));
   }
 
-  // ---------- AR scene built from data ----------
+  /* ---------------- AR scene ---------------- */
   function mk(tag, attrs, parent) {
     const e = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
@@ -210,41 +270,148 @@
     return e;
   }
 
-  function buildScene() {
-    const target = $('target');
+  const TAB_LABEL = { gallery: 'Photos', video: 'Video', towers: 'Availability' };
+  let views = [], current = null, nodes = {}, targetVisible = false;
+  let galleryIdx = 0, galleryTimer = null, gplane = null, videoEl = null;
+
+  function hasView(v) {
+    if (v === 'towers') return (P.towers || []).length > 0;
+    if (v === 'gallery') return gallery().length > 0;
+    if (v === 'video') return !!videoInfo();
+    return false;
+  }
+
+  function buildTowers(parent) {
+    const root = mk('a-entity', {}, parent);
     const towers = (P.towers || []).slice(0, 3);
     towers.forEach((t, i) => {
       const x = towers.length === 1 ? 0 : -0.25 + i * (0.5 / (towers.length - 1));
-      const group = mk('a-entity', { position: x + ' 0.05 0' }, target);
+      const group = mk('a-entity', { position: x + ' 0.05 0' }, root);
       const spin = mk('a-entity', { animation: 'property: rotation; to: 0 0 360; dur: 24000; loop: true; easing: linear' }, group);
-
       const soldFrac = t.units_total ? 1 - t.units_available / t.units_total : 0;
       const soldFloors = Math.round(t.floors * soldFrac);
       const floorH = Math.min(0.04, 0.4 / t.floors);
       for (let f = 0; f < t.floors; f++) {
-        mk('a-box', {
-          width: 0.17, height: 0.17, depth: floorH * 0.9,
-          position: '0 0 ' + ((f + 0.5) * floorH),
-          material: 'color: ' + (f < soldFloors ? '#F59E0B' : '#10B981')
-        }, spin);
+        mk('a-box', { width: 0.17, height: 0.17, depth: floorH * 0.9, position: '0 0 ' + ((f + 0.5) * floorH),
+                      material: 'color: ' + (f < soldFloors ? '#F59E0B' : '#10B981') }, spin);
       }
       mk('a-text', { value: t.name, align: 'center', color: '#ffffff', width: 0.7, position: '0 -0.16 0.01' }, group);
     });
-
     const pct = pctOf();
-    mk('a-plane', { width: 0.8, height: 0.035, position: '0 -0.42 0.002', color: '#374151' }, target);
+    mk('a-plane', { width: 0.8, height: 0.035, position: '0 -0.42 0.002', color: '#374151' }, root);
     mk('a-plane', { width: Math.max(0.001, 0.8 * pct / 100), height: 0.035,
-                    position: (-0.4 + 0.4 * pct / 100) + ' -0.42 0.004', color: '#10B981' }, target);
-    mk('a-text', { value: 'Construction ' + pct + '%', align: 'center', color: '#ffffff', width: 0.9, position: '0 -0.36 0.01' }, target);
+                    position: (-0.4 + 0.4 * pct / 100) + ' -0.42 0.004', color: '#10B981' }, root);
+    mk('a-text', { value: 'Construction ' + pct + '%', align: 'center', color: '#ffffff', width: 0.9, position: '0 -0.36 0.01' }, root);
+    return root;
+  }
 
-    target.addEventListener('targetFound', () => { $('hint').textContent = 'Amber = sold floors · Green = available'; });
-    target.addEventListener('targetLost', () => { $('hint').textContent = 'Point your camera at the card’s pattern'; });
+  function buildGallery(parent) {
+    const root = mk('a-entity', {}, parent);
+    mk('a-plane', { width: 0.96, height: 0.653, position: '0 0 0.005', color: '#ffffff' }, root); // white frame
+    gplane = mk('a-plane', { width: 0.92, height: 0.613, position: '0 0 0.01', material: 'shader: flat; color: #cccccc' }, root);
+    gallery().forEach((g) => { const im = new Image(); im.src = g.src; }); // warm the cache
+    showPhoto(0);
+    return root;
+  }
+
+  function buildVideo(parent) {
+    const root = mk('a-entity', {}, parent);
+    mk('a-plane', { width: 0.96, height: 0.5675, position: '0 0 0.005', color: '#ffffff' }, root);
+    const info = videoInfo();
+    const v = document.createElement('video');
+    v.id = 'arvid';
+    v.src = info.src;
+    if (info.poster) v.poster = info.poster;
+    v.loop = true; v.muted = true; v.playsInline = true; v.preload = 'auto';
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    $('assets').appendChild(v);
+    videoEl = v;
+    mk('a-video', { src: '#arvid', width: 0.92, height: 0.5175, position: '0 0 0.01' }, root);
+    return root;
+  }
+
+  function showPhoto(i) {
+    const g = gallery();
+    if (!g.length || !gplane) return;
+    galleryIdx = (i + g.length) % g.length;
+    gplane.setAttribute('material', { shader: 'flat', color: '#ffffff', src: g[galleryIdx].src });
+    updateCaption();
+  }
+
+  function buildScene() {
+    const target = $('target');
+    views = (P.ar_views && P.ar_views.length ? P.ar_views : ['towers']).filter(hasView);
+    if (!views.length) views = ['towers'];
+    const builders = { towers: buildTowers, gallery: buildGallery, video: buildVideo };
+    views.forEach((v) => { nodes[v] = builders[v](target); nodes[v].setAttribute('visible', 'false'); });
+
+    target.addEventListener('targetFound', () => { targetVisible = true; applyPlayback(); });
+    target.addEventListener('targetLost', () => { targetVisible = false; applyPlayback(); });
+    setView(views[0]);
+  }
+
+  function setView(v) {
+    current = v;
+    views.forEach((k) => nodes[k] && nodes[k].setAttribute('visible', k === v ? 'true' : 'false'));
+    renderTabs();
+    renderControls();
+    applyPlayback();
+  }
+
+  // Runs whenever the view or the card visibility changes: starts/stops video and the photo slideshow.
+  function applyPlayback() {
+    const g = gallery();
+    if (videoEl) { if (current === 'video' && targetVisible) safePlay(videoEl); else videoEl.pause(); }
+    clearInterval(galleryTimer); galleryTimer = null;
+    if (current === 'gallery' && targetVisible && g.length > 1) galleryTimer = setInterval(() => showPhoto(galleryIdx + 1), 4000);
+    updateCaption();
+  }
+
+  function updateCaption() {
+    let t = 'Point your camera at the card’s pattern';
+    if (targetVisible) {
+      if (current === 'gallery') { const g = gallery(); t = (galleryIdx + 1) + ' / ' + g.length + (g[galleryIdx].caption ? ' · ' + g[galleryIdx].caption : ''); }
+      else if (current === 'video') t = (videoInfo().caption || 'Video') + (videoEl && videoEl.muted ? ' · tap “Sound on” to hear it' : '');
+      else t = 'Amber = sold floors · Green = available';
+    }
+    $('ar-caption').textContent = t;
+  }
+
+  function renderTabs() {
+    const box = $('ar-tabs');
+    box.replaceChildren();
+    if (views.length < 2) return;
+    views.forEach((v) => box.append(h('button', { class: 'pill tab' + (v === current ? ' on' : ''), onclick: () => setView(v) }, TAB_LABEL[v])));
+  }
+
+  function renderControls() {
+    const box = $('ar-controls');
+    box.replaceChildren();
+    if (current === 'gallery' && gallery().length > 1) {
+      box.append(
+        h('button', { class: 'pill sm', onclick: () => { showPhoto(galleryIdx - 1); applyPlayback(); } }, '‹ Prev'),
+        h('button', { class: 'pill sm', onclick: () => { showPhoto(galleryIdx + 1); applyPlayback(); } }, 'Next ›')
+      );
+    }
+    if (current === 'video') {
+      const b = h('button', { class: 'pill sm' }, videoEl && !videoEl.muted ? '🔇 Sound off' : '🔊 Sound on');
+      b.addEventListener('click', () => {
+        if (!videoEl) return;
+        videoEl.muted = !videoEl.muted;
+        if (!videoEl.muted) $('music').pause();
+        b.textContent = videoEl.muted ? '🔊 Sound on' : '🔇 Sound off';
+        updateCaption();
+      });
+      box.append(b);
+    }
+    const mb = musicButton('pill sm');
+    if (mb) box.append(mb);
   }
 
   async function startAR() {
     $('page').hidden = true;
-    $('arbar-top').hidden = false;
-    $('arbar-bottom').hidden = false;
+    $('ar-top').hidden = false;
+    $('ar-bottom').hidden = false;
     try {
       const sys = $('scene').systems['mindar-image-system'];
       await sys.start();
@@ -256,8 +423,10 @@
   }
   function stopAR() {
     try { $('scene').systems['mindar-image-system'].stop(); } catch (e) { /* ignore */ }
-    $('arbar-top').hidden = true;
-    $('arbar-bottom').hidden = true;
+    targetVisible = false;
+    applyPlayback();
+    $('ar-top').hidden = true;
+    $('ar-bottom').hidden = true;
     $('page').hidden = false;
   }
   $('btn-back').addEventListener('click', stopAR);
