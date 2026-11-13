@@ -10,24 +10,82 @@
       "location": "Whitefield, Bengaluru",
       "status": "Under construction",
       "possession": "Dec 2027",
-      "rera": "PRM/KA/RERA/nawaz1234",
+      "rera": "PRM/KA/RERA/DEMO-0000",
       "configs": "2 & 3 BHK apartments",
       "price_from": "₹1.2 Cr onwards",
-      "sales_whatsapp": "919845180066",
+      "sales_whatsapp": "910000000000",
       "disclaimer": "Demo data for illustration only. The 3D view is an artist’s impression and not to scale.",
-      "progress": { "stage": "Structure – 7th slab", "percent": 76 },
+      "progress": {
+        "stage": "Structure – 7th slab",
+        "percent": 38
+      },
       "towers": [
-        { "name": "Tower A", "floors": 14, "units_total": 56, "units_available": 5 },
-        { "name": "Tower B", "floors": 12, "units_total": 48, "units_available": 30 }
+        {
+          "name": "Tower A",
+          "floors": 14,
+          "units_total": 56,
+          "units_available": 21
+        },
+        {
+          "name": "Tower B",
+          "floors": 12,
+          "units_total": 48,
+          "units_available": 30
+        }
       ],
       "updates": [
-        { "date": "2026-11-05", "text": "Tower A: 7th floor slab cast." },
-        { "date": "2026-10-18", "text": "Clubhouse foundation work started." },
-        { "date": "2026-09-30", "text": "Tower B: 5th floor slab cast." }
+        {
+          "date": "2026-11-05",
+          "text": "Tower A: 7th floor slab cast."
+        },
+        {
+          "date": "2026-10-18",
+          "text": "Clubhouse foundation work started."
+        },
+        {
+          "date": "2026-09-30",
+          "text": "Tower B: 5th floor slab cast."
+        }
       ],
       "cps": {
-        "ravi":  { "name": "Ravi Kumar", "role": "Channel partner" },
-        "meena": { "name": "Meena Rao",  "role": "Channel partner" }
+        "ravi": {
+          "name": "Ravi Kumar",
+          "role": "Channel partner"
+        },
+        "meena": {
+          "name": "Meena Rao",
+          "role": "Channel partner"
+        }
+      },
+      "ar_views": [
+        "gallery",
+        "video",
+        "towers"
+      ],
+      "media": {
+        "gallery": [
+          {
+            "src": "media/progress-1.jpg",
+            "caption": "Sep 2026 · Tower B, 5th slab"
+          },
+          {
+            "src": "media/progress-2.jpg",
+            "caption": "Oct 2026 · Clubhouse foundation"
+          },
+          {
+            "src": "media/progress-3.jpg",
+            "caption": "Nov 2026 · Tower A, 7th slab"
+          }
+        ],
+        "video": {
+          "src": "media/walkthrough.mp4",
+          "poster": "media/walkthrough-poster.jpg",
+          "caption": "Project walkthrough"
+        },
+        "audio": {
+          "src": "media/welcome.mp3",
+          "label": "Welcome message"
+        }
       }
     }
   }
