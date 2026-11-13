@@ -98,12 +98,20 @@
     <a-entity id="target" mindar-image-target="targetIndex: 0"></a-entity>
   </a-scene>
 
+<script src="config.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
-  const pid = params.get('p') || 'greenmeadows';
-  const cpCode = (params.get('cp') || '').toLowerCase();
-  let DATA, P, CP;
+  const pid = (params.get('p') || 'greenmeadows').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const cpCode = (params.get('cp') || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+  const CFG = window.APP_CONFIG || {};
+  const SB_URL = (CFG.supabaseUrl || '').replace(/\/+$/, '');
+  const SB_KEY = CFG.supabaseKey || '';
+  const USE_DB = !!(SB_URL && SB_KEY);   // empty config = demo mode (reads data/projects.json)
+  const STORAGE_BASE = USE_DB ? SB_URL + '/storage/v1/object/public/' + (CFG.bucket || 'project-media') + '/' : '';
+  // In the project data, "storage:greenmeadows/photo1.jpg" means a file in the Supabase storage bucket.
+  const asset = (s) => (s && s.startsWith('storage:') && STORAGE_BASE) ? STORAGE_BASE + s.slice(8) : s;
+  let DATA, P, CP, foundOnce = false;
 
   // Tiny DOM helper. Uses textContent only, so data from the JSON can never inject HTML.
   function h(tag, props, ...kids) {
@@ -122,15 +130,45 @@
   const safePlay = (el) => { try { const r = el.play(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* ignore */ } };
 
   const media = () => P.media || {};
-  const gallery = () => (media().gallery || []).filter((g) => g && g.src);
-  const videoInfo = () => (media().video && media().video.src ? media().video : null);
-  const audioInfo = () => (media().audio && media().audio.src ? media().audio : null);
+  const gallery = () => (media().gallery || []).filter((g) => g && g.src).map((g) => Object.assign({}, g, { src: asset(g.src) }));
+  const videoInfo = () => {
+    const v = media().video;
+    return v && v.src ? Object.assign({}, v, { src: asset(v.src), poster: v.poster ? asset(v.poster) : undefined }) : null;
+  };
+  const audioInfo = () => {
+    const a = media().audio;
+    return a && a.src ? Object.assign({}, a, { src: asset(a.src) }) : null;
+  };
 
   function waLink(text) { return 'https://wa.me/' + P.sales_whatsapp + '?text=' + encodeURIComponent(text); }
   function baseMsg() { return 'Hi, I’m interested in ' + P.name + '.' + (CP ? ' (Ref: ' + cpCode + ')' : ''); }
 
-  fetch('data/projects.json', { cache: 'no-store' })
-    .then((r) => r.json())
+  // The database only returns projects marked published (enforced by the database itself, not just this page).
+  async function loadData() {
+    if (USE_DB) {
+      const r = await fetch(SB_URL + '/rest/v1/projects?slug=eq.' + encodeURIComponent(pid) + '&published=eq.true&select=data',
+                            { headers: { apikey: SB_KEY } });
+      if (!r.ok) throw new Error('database responded ' + r.status);
+      const rows = await r.json();
+      return { config: {}, projects: rows.length ? { [pid]: rows[0].data } : {} };
+    }
+    const r = await fetch('data/projects.json', { cache: 'no-store' });
+    return r.json();
+  }
+
+  // Records page opens / AR starts. Fails silently: a tracking problem must never break the page.
+  function track(event) {
+    if (!USE_DB) return;
+    try {
+      fetch(SB_URL + '/rest/v1/scans', {
+        method: 'POST', keepalive: true,
+        headers: { apikey: SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ project_slug: pid, cp_code: cpCode || null, event: event })
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
+  }
+
+  loadData()
     .then(init)
     .catch((e) => { console.error(e); $('content').textContent = 'Could not load project data.'; });
 
@@ -139,6 +177,7 @@
     P = d.projects[pid];
     if (!P) { $('content').textContent = 'Project not found.'; return; }
     CP = (P.cps || {})[cpCode] || null;
+    track('page_view');
     document.title = P.name;
     $('ar-title').textContent = P.name;
     $('ar-wa').href = waLink(baseMsg());
@@ -175,7 +214,7 @@
     const vid = videoInfo();
 
     const form = h('form', { hidden: '', id: 'lead-form' },
-      h('input', { type: 'text', id: 'fname', placeholder: 'Your name', required: '', autocomplete: 'name' }),
+      h('input', { type: 'text', id: 'fname', placeholder: 'Your name', required: '', maxlength: '100', autocomplete: 'name' }),
       h('input', { type: 'tel', id: 'fphone', placeholder: 'Phone number', required: '', autocomplete: 'tel', pattern: '[0-9+ ]{10,15}' }),
       h('label', { class: 'chk' }, h('input', { type: 'checkbox', id: 'fconsent', required: '' }),
         'I agree to be contacted about this project.'),
@@ -244,6 +283,22 @@
     const lead = { project: pid, cp: cpCode || null, name: f.fname.value.trim(), phone: f.fphone.value.trim(),
                    consent: f.fconsent.checked, ts: new Date().toISOString() };
     const msg = $('lead-msg');
+    if (USE_DB) {
+      try {
+        const r = await fetch(SB_URL + '/rest/v1/leads', {
+          method: 'POST',
+          headers: { apikey: SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ project_slug: pid, cp_code: cpCode || null, name: lead.name, phone: lead.phone, consent: lead.consent })
+        });
+        if (!r.ok) throw new Error('status ' + r.status);
+        msg.textContent = 'Thank you! The sales team will call you shortly.';
+        e.target.reset();
+      } catch (err) {
+        console.error(err);
+        msg.textContent = 'Could not send right now. Please use WhatsApp instead.';
+      }
+      return;
+    }
     const ep = DATA.config && DATA.config.lead_endpoint;
     if (ep) {
       try {
@@ -345,7 +400,7 @@
     const builders = { towers: buildTowers, gallery: buildGallery, video: buildVideo };
     views.forEach((v) => { nodes[v] = builders[v](target); nodes[v].setAttribute('visible', 'false'); });
 
-    target.addEventListener('targetFound', () => { targetVisible = true; applyPlayback(); });
+    target.addEventListener('targetFound', () => { targetVisible = true; if (!foundOnce) { foundOnce = true; track('ar_target_found'); } applyPlayback(); });
     target.addEventListener('targetLost', () => { targetVisible = false; applyPlayback(); });
     setView(views[0]);
   }
@@ -409,6 +464,7 @@
   }
 
   async function startAR() {
+    track('ar_start');
     $('page').hidden = true;
     $('ar-top').hidden = false;
     $('ar-bottom').hidden = false;
