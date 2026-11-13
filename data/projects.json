@@ -17,7 +17,7 @@
       "disclaimer": "Demo data for illustration only. The 3D view is an artist’s impression and not to scale.",
       "progress": { "stage": "Structure – 7th slab", "percent": 38 },
       "towers": [
-        { "name": "Tower A", "floors": 14, "units_total": 56, "units_available": 21 },
+        { "name": "Tower A", "floors": 14, "units_total": 56, "units_available": 5 },
         { "name": "Tower B", "floors": 12, "units_total": 48, "units_available": 30 }
       ],
       "updates": [
